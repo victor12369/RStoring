@@ -1,9 +1,9 @@
 # RStoring
 A general version-compatible serialization library for .Net.
 
-Based on System.Runtime.Serialization.
+Based on `System.Runtime.Serialization`.
 
-In order to solve version-compatible and other problems of System.Runtime.Serialization.
+In order to solve version-compatible and other problems of `System.Runtime.Serialization`.
 
 Usage:
 ```c#
