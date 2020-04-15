@@ -9,30 +9,38 @@ using System.Web.Script.Serialization;
 
 namespace RStoring {
 
+	/// <summary>
+	/// Mark a class to store.
+	/// </summary>
 	[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Enum, AllowMultiple = false, Inherited = false)]
 	public class Storable : Attribute {
+		/// <summary>
+		/// A unique id.
+		/// </summary>
 		public string Name { get; }
 		public Storable(string name) { Name = name; }
 	}
 
 	/// <summary>
-	/// Usage:
-	///		[Storable("XXXXX")]
-	///			class XXX {
-	///			[Stored(0)] int a;
-	///			[Stored(1)] int b { get; set; }
-	///			[Stored(2, Defualt = 123)] int c;
-	///			[StoringConstructer(1/*b*/)] int XX() { return a + c; }
-	///		}
+	/// mark a field or auto-property to serialize.
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
 	public class Stored : Attribute {
+		/// <summary>
+		/// A unique id in one class.
+		/// </summary>
 		public int ID { get; }
+		/// <summary>
+		/// If can't find value when deserialize, use Defualt
+		/// </summary>
 		public object Defualt { get; set; }
 		public Stored(int id) {
 			ID = id;
 		}
 	}
+	/// <summary>
+	/// Mark a function to construct defualt value.
+	/// </summary>
 	[AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 	public class StoringConstructer : Attribute {
 		public int ID { get; }
@@ -40,6 +48,9 @@ namespace RStoring {
 			ID = id;
 		}
 	}
+	/// <summary>
+	/// Make a class able to control serialization for itself.
+	/// </summary>
 	interface IStorable {
 		void GetObjectData(SerializationInfo info, StreamingContext context);
 		void SetObjectData(SerializationInfo info, StreamingContext context);
@@ -61,6 +72,10 @@ namespace RStoring {
 		public const BindingFlags FindFlag = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
 		public const string StoringAssemblyName = ">Storing<";
 		static private AutomaticInitializer __initializer = new AutomaticInitializer();
+		/// <summary>
+		/// Register a class with [Stored].
+		/// Auto register, no need to call manually.
+		/// </summary>
 		public static void RegisterClass(Type c) {
 			if (Registered.Contains(c)) return;
 			if (!Attribute.IsDefined(c, typeof(Storable))) throw new Exception("Can not register a class without [Storable]");
@@ -70,6 +85,9 @@ namespace RStoring {
 			RegisterList.Add(name, c);
 			Registered.Add(c);
 		}
+		/// <summary>
+		/// Check a class with [Stored] if it breaked some rules..
+		/// </summary>
 		public static void CheckClass(Type c) {
 			if (!Attribute.IsDefined(c, typeof(Storable))) return;
 			HashSet<int> hs = new HashSet<int>();
@@ -115,13 +133,20 @@ namespace RStoring {
 			var asses = AppDomain.CurrentDomain.GetAssemblies();
 			foreach (var asse in asses) CheckClassAll(asse);
 		}
-
+		/// <summary>
+		/// Get a formatter that supports [Stored].
+		/// [Serializable] is also supported.
+		/// </summary>
 		public static T GetFormatter<T>() where T : IFormatter, new() {
 			T ret = new T();
 			ret.Binder = new StoringBinder();
 			ret.SurrogateSelector = new StoringSurrogateSelector();
 			return ret;
 		}
+		/// <summary>
+		/// Get a BinaryFormatter that supports [Stored].
+		/// [Serializable] is also supported.
+		/// </summary>
 		public static BinaryFormatter GetBinaryFormatter() {
 			return new BinaryFormatter() { Binder = new StoringBinder(), SurrogateSelector = new StoringSurrogateSelector() };
 		}
@@ -161,6 +186,18 @@ namespace RStoring {
 			}
 			return null;
 		}
+
+		/// <summary>
+		/// Get a formatter that can deserialize to Dictionary(string, object).
+		/// Not support serialize.
+		/// </summary>
+		public static T GetDictionaryFormatter<T>() where T : IFormatter, new() {
+			T ret = new T();
+			ret.Binder = new JsonBinder();
+			ret.SurrogateSelector = new JsonSurrogateSelector();
+			return ret;
+		}
+
 		public static Dictionary<string, object> DeserializeBinaryFormatToDictionary(System.IO.Stream stream) {
 			BinaryFormatter bf = new BinaryFormatter() { Binder = new JsonBinder(), SurrogateSelector = new JsonSurrogateSelector() };
 			Dictionary<string, object> dict = (Dictionary<string, object>)bf.Deserialize(stream);

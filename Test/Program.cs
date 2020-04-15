@@ -8,14 +8,22 @@ using System.Text;
 using System.Threading.Tasks;
 using RStoring;
 namespace EmpriseDesign {
-	[Storable("R_TEST")]
-	public class Test {
-		[Stored(0)] int x;
-	}
 	[Storable("R_GTEST")]
 	public class GTest<T1, T2> {
 		[Stored(0)] T1 x;
 		[Stored(1)] T2 y;
+	}
+
+	[Storable("R_TEST")]//A unique ID.
+	public class Test {
+		[Stored(0/*Should be unique in one class*/)] int x;
+		[Stored(1, Defualt = 123/*If can't find value when deserialize, use Defualt*/)] int y;
+		[Stored(2)] int z;
+		//If can't find value when deserialize, use this function to construct.
+		//With higher priority than Stored.Defualt
+		[StoringConstructer(2)]int ConstructZ() { 
+			return 321; 
+		}
 	}
 
 
