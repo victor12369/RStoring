@@ -51,7 +51,7 @@ namespace RStoring {
 
 			Type iect = obj.GetType().GetInterface("IExtractCompleted");
 			if (iect != null)
-				iect.GetMethod("SetObjectData").Invoke(obj, new object[] { info, context });
+				iect.GetMethod("ExtractCompleted").Invoke(obj, new object[] { info, context });
 			return obj;
 		}
 	}

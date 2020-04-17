@@ -22,7 +22,7 @@ namespace RStoring {
 	}
 
 	/// <summary>
-	/// mark a field or auto-property to serialize.
+	/// Mark a field or auto-property to serialize.
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
 	public class Stored : Attribute {
@@ -71,6 +71,20 @@ namespace RStoring {
 		static public HashSet<Type> Registered { get; private set; } = new HashSet<Type>();
 		public const BindingFlags FindFlag = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
 		public const string StoringAssemblyName = ">Storing<";
+
+		/// <summary>
+		/// convert auto-properties' fields' name to auto-properties' name
+		/// defualt:  "&lt;prop&gt;k_BackingField" -> "prop"
+		/// </summary>
+		public static Func<string, string> AutoPropConverter { get; set; } = (string name) => {
+			string[] s = name.Split(new char[] { '<', '>' });
+			if (s.Length != 3) return null;
+			if (s[0] == "" && s[2] == "k__BackingField") {
+				return s[1];
+			}
+			return null;
+		};
+
 		static private AutomaticInitializer __initializer = new AutomaticInitializer();
 		/// <summary>
 		/// Register a class with [Stored].
@@ -86,8 +100,11 @@ namespace RStoring {
 			Registered.Add(c);
 		}
 		/// <summary>
-		/// Check a class with [Stored] if it breaked some rules..
+		/// Check a class with [Stored] if it breaked some rules.
 		/// </summary>
+		/// <exception cref="SerializationException">
+		/// Throw if a class break some rules.
+		/// </exception>
 		public static void CheckClass(Type c) {
 			if (!Attribute.IsDefined(c, typeof(Storable))) return;
 			HashSet<int> hs = new HashSet<int>();
@@ -95,20 +112,20 @@ namespace RStoring {
 			var sfis = GetStoredFields(c);
 			foreach (var fi in sfis) {
 				int id = GetStoredID(c, fi).Value;
-				if (hs.Contains(id)) throw new Exception($"In {{{c}}}: Assign multiple [Stored({id})]");
+				if (hs.Contains(id)) throw new SerializationException($"In {{{c}}}: Assign multiple [Stored({id})]");
 				hs.Add(id);
 			}
 			var smis = GetStoringConstructer(c);
 			foreach (var mi in smis) {
 				int id = mi.GetCustomAttribute<StoringConstructer>().ID;
-				if (!hs.Contains(id)) throw new Exception($"In {{{c}}}: Assign [StoringConstructer({id})] without [Stored({id})]");
-				if (hs2.Contains(id)) throw new Exception($"In {{{c}}}: Assign multiple [StoringConstructer({id})]");
+				if (!hs.Contains(id)) throw new SerializationException($"In {{{c}}}: Assign [StoringConstructer({id})] without [Stored({id})]");
+				if (hs2.Contains(id)) throw new SerializationException($"In {{{c}}}: Assign multiple [StoringConstructer({id})]");
 				hs2.Add(id);
 			}
 			PropertyInfo[] pis = c.GetProperties(FindFlag);
 			var spis = from pi in pis where Attribute.IsDefined(pi, typeof(Stored)) select pi;
 			foreach (var pi in spis) {
-				if (c.GetField($"<{pi.Name}>k__BackingField", FindFlag) == null) throw new Exception($"In {{{c}}}: Assign [Stored(ID)] on a non-automatic property {{{pi.Name}}}");
+				if (c.GetField($"<{pi.Name}>k__BackingField", FindFlag) == null) throw new SerializationException($"In {{{c}}}: Assign [Stored(ID)] on a non-automatic property {{{pi.Name}}}");
 			}
 		}
 
@@ -116,6 +133,9 @@ namespace RStoring {
 			RegisterClassAll(args.LoadedAssembly);
 		}
 
+		/// <summary>
+		/// Auto register when an assembly loaded, no need to call manually.
+		/// </summary>
 		public static void RegisterClassAll(Assembly asse) {
 			Type[] ts = asse.GetTypes();
 			var sts = from t in ts where Attribute.IsDefined(t, typeof(Storable)) select t;
@@ -166,6 +186,7 @@ namespace RStoring {
 			if (Attribute.IsDefined(fi, typeof(Stored))) return fi.GetCustomAttribute<Stored>().ID;
 			string[] s = fi.Name.Split(new char[] { '<', '>' });
 			if (s.Length != 3) return null;
+
 			if (s[0] == "" && s[2] == "k__BackingField") {
 				PropertyInfo pi = t.GetProperty(s[1], FindFlag);
 				if (Attribute.IsDefined(pi, typeof(Stored)))
@@ -188,7 +209,7 @@ namespace RStoring {
 		}
 
 		/// <summary>
-		/// Get a formatter that can deserialize to Dictionary(string, object).
+		/// Get a formatter that can deserialize to Dictionary&lt;string, object&gt;.
 		/// Not support serialize.
 		/// </summary>
 		public static T GetDictionaryFormatter<T>() where T : IFormatter, new() {
@@ -199,7 +220,7 @@ namespace RStoring {
 		}
 
 		public static Dictionary<string, object> DeserializeBinaryFormatToDictionary(System.IO.Stream stream) {
-			BinaryFormatter bf = new BinaryFormatter() { Binder = new JsonBinder(), SurrogateSelector = new JsonSurrogateSelector() };
+			BinaryFormatter bf = GetDictionaryFormatter<BinaryFormatter>();
 			Dictionary<string, object> dict = (Dictionary<string, object>)bf.Deserialize(stream);
 			return dict;
 		}
@@ -228,7 +249,7 @@ namespace RStoring {
 				StringBuilder sb = new StringBuilder(t.AssemblyQualifiedName);
 				foreach (var gt in gts)
 					sb.Replace(gt.AssemblyQualifiedName, GetTypeStoringName(gt));
-				if (Type.GetType(sb.ToString()) == t) { Console.WriteLine("123123123"); }
+				//if (Type.GetType(sb.ToString()) == t) { Console.WriteLine("123123123"); }
 				return sb.ToString();
 			}
 			//Type.GetType("",,,)

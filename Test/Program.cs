@@ -16,13 +16,14 @@ namespace EmpriseDesign {
 
 	[Storable("R_TEST")]//A unique ID.
 	public class Test {
-		[Stored(0/*Should be unique in one class*/)] int x;
+		[Stored(0/*Should be unique in one class*/)] public int x { get; set; }//field or auto-property
 		[Stored(1, Defualt = 123/*If can't find value when deserialize, use Defualt*/)] int y;
 		[Stored(2)] int z;
 		//If can't find value when deserialize, use this function to construct.
 		//With higher priority than Stored.Defualt
-		[StoringConstructer(2)]int ConstructZ() { 
-			return 321; 
+		[StoringConstructer(2)]
+		int ConstructZ() {
+			return 321;
 		}
 	}
 
@@ -31,7 +32,7 @@ namespace EmpriseDesign {
 	class Program {
 		static void Store() {
 			//var obj = new List<int>();
-			var obj = new List<GTest<GTest<int, Test>, List<Test>>>();
+			var obj = new Test() { x = 123 };
 			BinaryFormatter bf = Storing.GetBinaryFormatter();
 			FileStream fs = new FileStream("E:\\a.txt", FileMode.Create);
 			bf.Serialize(fs, obj);
@@ -48,8 +49,9 @@ namespace EmpriseDesign {
 			Storing.CheckClassAllAssembly();
 			Store();
 			Read();
+			Storing.AutoPropConverter = null;
 			//var obj = new Dictionary<int, Test>();
-			var obj = new List<GTest<GTest<int, Test>, List<Test>>>();
+			var obj = new Test();
 			string s = Storing.GetTypeStoringName(obj.GetType());
 			Console.WriteLine(s);
 			Type tt = Type.GetType(s);
